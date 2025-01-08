@@ -1,39 +1,88 @@
-# Big Data Pipeline for Youtube analytics using Lambda Architecture
+# YouTube Analytics Pipeline using Lambda Architecture
 
-The application is an IoT data processing and monitoring application. 
+This application is a YouTube data processing and monitoring system designed to handle massive quantities of data using the **Lambda Architecture**. It processes both real-time and batch data to provide insights into YouTube video and channel metrics.
 
-### Architecture
+---
 
-We used **Lambda architecture** which is a data-processing architecture designed to handle massive quantities of data by taking advantage of both batch and stream-processing methods.
+## **Architecture**
+The application follows the Lambda Architecture, which combines batch processing and stream processing to handle large-scale data efficiently. The architecture is divided into three layers:
 
+1. **Batch Layer**: Processes historical data to compute pre-aggregated views.
+2. **Speed Layer**: Handles real-time data streams for immediate insights.
+3. **Serving Layer**: Combines results from the batch and speed layers for querying and visualization.
 
-We divided the application into three modules. These modules are standalone Maven applications written in Java and can be built and run independently.
+---
 
-1. **Kafka Producer:** This module simulates Realtime IoT data coming from a Sensor. It generates mock Temperature and Humidity values every 2 to 5s which are then sent as events to a topic in Kafka.
+## **Modules**
+The application is divided into three standalone Maven modules, each written in Java and capable of being built and run independently.
 
-2. **Spark Processor:** This module contains two Processors :
-    - **Stream Processor** : This part of the Speed Layer ( view architecture ). Here, we are processing the streaming data using Kafka with Spark Streaming API. The SensorData is processed By Spark Straming which will seperates it into **Temperature** and **Humidity** and storing it in Cassandra. Simultaneously, the streamed data is then appended into Hadoop HDFS for batch processing.
-    - **Batch Processor** : The processor needs visibility on all the SensorData in order to calculate the average of both Temperature and Humidity. We are processing the batch data using Spark and storing the pre-computed views into Cassandra.
+### **1. Kafka Producer**
+**Purpose**: Simulates real-time YouTube data ingestion.
 
-3. **Dashboard:** This is a Spring Boot application which will retrieve data from the Cassandra database and send it to a web page. This application uses Web Sockets and jQuery to push the streamed data to the web page in fixed intervals so data will be refreshed automatically. The average values are pushed in different intervals since Batch Processing takes a longer time. We used two different types of Google chart tools to showcase realtime and average values.
+#### **Functionality**:
+- Reads YouTube data from a CSV file (`YouTubeDataset_withChannelElapsed.csv`).
+- Parses the data into `YouTubeData` objects.
+- Sends the data as events to a Kafka topic (`YouTube_topic`).
 
-### Execution
+#### **Key Metrics**:
+- Video views, likes, dislikes, and comments.
+- Channel views, subscribers, and engagement ratios.
 
+### **2. Spark Processor**
 
-All component parts are dynamically managed using Docker, which means you don't need to worry about setting up your local environment, the only thing you need is to have Docker installed. Just run 
+#### **Stream Processor (Speed Layer)**
+**Purpose**: Processes real-time data streams.
 
-```
+**Functionality**:
+- Reads data from the Kafka topic (`YouTube_topic`).
+- Separates and processes metrics such as video views, likes, dislikes, and comments.
+- Stores processed data in Cassandra for real-time querying.
+- Appends raw data to Hadoop HDFS for batch processing.
+
+#### **Batch Processor (Batch Layer)**
+**Purpose**: Processes historical data for comprehensive analytics.
+
+**Functionality**:
+- Reads raw data from Hadoop HDFS.
+- Computes aggregated metrics (e.g., average views, likes, dislikes, and comments per video or channel).
+- Stores pre-computed views in Cassandra for serving layer queries.
+
+### **3. Dashboard**
+**Purpose**: Visualizes real-time and batch-processed data.
+
+**Functionality**:
+- Retrieves data from Cassandra.
+- Uses WebSocket and jQuery to push real-time updates to the web page.
+- Displays metrics using Google Charts:
+   - Real-time metrics (e.g., video views, likes, dislikes, comments).
+   - Batch-processed metrics (e.g., average views, likes, dislikes, comments).
+
+#### **Features**:
+- Automatic data refresh at fixed intervals.
+- Separate intervals for real-time and batch-processed data.
+
+---
+
+## **Execution**
+The application is containerized using Docker, making it easy to set up and run. Follow these steps to execute the application:
+
+### **Prerequisites**
+- Install Docker on your machine.
+
+### **Steps**
+
+#### 1. Start the Docker containers:
+```bash
 docker-compose up
 ```
 
-You must also create the database schema in Cassandra
-
-```
+#### 2. Create the Cassandra database schema:
+```bash
 docker exec cassandra-iot cqlsh --username cassandra --password cassandra -f /schema.cql
 ```
 
-You must also create the folder to save the data for later batch processing
-```
+#### 3. Set up Hadoop HDFS directories:
+```bash
 docker exec namenode hdfs dfs -rm -r /lambda-arch
 docker exec namenode hdfs dfs -mkdir /lambda-arch
 docker exec namenode hdfs dfs -mkdir /lambda-arch/checkpoint
@@ -41,29 +90,88 @@ docker exec namenode hdfs dfs -chmod -R 777 /lambda-arch
 docker exec namenode hdfs dfs -chmod -R 777 /lambda-arch/checkpoint
 ```
 
-Run the Stream Processor
-```
+#### 4. Run the Stream Processor:
+```bash
 docker exec spark-master /spark/bin/spark-submit --class com.bigdata.spark.processor.StreamProcessor --master spark://localhost:7077 /opt/spark-data/bigdata-spark-processor-1.0.0.jar
 ```
 
-Run the Batch Processor
-```
+#### 5. Run the Batch Processor:
+```bash
 docker exec spark-master /spark/bin/spark-submit --class com.bigdata.spark.processor.BatchProcessor --master spark://localhost:7077 /opt/spark-data/bigdata-spark-processor-1.0.0.jar
 ```
 
-You can view the dashboard on
+#### 6. Access the Dashboard:
+Open your browser and navigate to:
 ```
-localhost:3000
+http://localhost:3000
 ```
 
-### Stack
+---
 
-- Java 23
-- Maven
-- SpringBoot
-- ZooKeeper
-- Kafka
-- Cassandra
-- Spark 
-- Hadoop HDFS
-- Docker
+## **Stack**
+The application uses the following technologies:
+
+- **Programming Language**: Java 23
+- **Build Tool**: Maven
+- **Web Framework**: Spring Boot
+- **Stream Processing**: Kafka, Spark Streaming
+- **Batch Processing**: Spark, Hadoop HDFS
+- **Database**: Cassandra
+- **Containerization**: Docker
+- **Visualization**: Google Charts, jQuery, WebSocket
+
+---
+
+## **Key Features**
+
+### **Real-Time Data Processing**:
+- Processes YouTube data in real-time using Kafka and Spark Streaming.
+- Provides immediate insights into video and channel metrics.
+
+### **Batch Data Processing**:
+- Computes aggregated metrics (e.g., averages) using Spark and Hadoop HDFS.
+- Stores pre-computed views in Cassandra for efficient querying.
+
+### **Interactive Dashboard**:
+- Displays real-time and batch-processed metrics using Google Charts.
+- Automatically refreshes data at fixed intervals.
+
+### **Scalable Architecture**:
+- Uses Lambda Architecture to handle both real-time and batch data efficiently.
+- Containerized using Docker for easy deployment and scaling.
+
+---
+
+## **Example Use Case**
+Suppose the CSV file contains the following data:
+
+| videoId | videoViewCount | videoLikeCount | videoDislikeCount | videoCommentCount | channelViewCount | subscriberCount | videoPublished |
+|---------|----------------|----------------|-------------------|-------------------|------------------|-----------------|----------------|
+| abc123  | 1000           | 500            | 50                | 200               | 10000            | 1000            | 2023-10-01     |
+| xyz456  | 2000           | 1000           | 100               | 500               | 20000            | 2000            | 2023-10-02     |
+
+The application will:
+
+1. Ingest the data from the CSV file.
+2. Stream the data to Kafka.
+3. Process the data in real-time using Spark Streaming.
+4. Store the processed data in Cassandra.
+5. Compute aggregated metrics (e.g., average views, likes, dislikes) using Spark Batch Processing.
+6. Visualize the data in the dashboard.
+
+---
+
+## **Next Steps**
+
+### **Adding More Metrics**:
+- Calculate engagement rates, subscriber growth, and video performance trends.
+
+### **Improving the Dashboard**:
+- Add interactive charts and filters for better data exploration.
+
+### **Scaling the Application**:
+- Use a distributed Kafka cluster for high-throughput data streaming.
+- Scale the Spark job to handle larger datasets.
+
+### **Monitoring and Logging**:
+- Add logging and monitoring using tools like Prometheus and Grafana
